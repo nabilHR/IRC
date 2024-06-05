@@ -19,13 +19,17 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <map>
 
 class server {
 
     public:
+            std::vector<int> client;
+            std::map<int,std::string> mab;
             unsigned int port;
             std::string password;
             int server_socket;
+            int fd_epoll;
     public:
             server();
             server(const std::string& port,const std::string& password);
@@ -35,4 +39,6 @@ class server {
             void    create_socket();
             void    bind_socket();
             void    create_server();
+            void    add_connection();
+            void    handle_request(int fd);
 };

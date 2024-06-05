@@ -11,7 +11,7 @@
 # **************************************************************************** #
 
 
-CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -fsanitize=address
+CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -fsanitize=address -g3
 CXX = c++
 file_cpp = ircserv.cpp  server.cpp
 file_o   = ircserv.o  server.o

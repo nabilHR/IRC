@@ -66,7 +66,6 @@
         void    server::create_server()
         {
             struct epoll_event ev;
-            std::vector<int> client;
             struct epoll_event evlist[100];
             create_socket();
             int nb;
@@ -92,42 +91,54 @@
                 {       
                     if(this->server_socket == evlist[i].data.fd)
                     {
-                        struct sockaddr_in addr;
-                        socklen_t  addr_len = sizeof(addr);
-                        int client_socket;
-                        client_socket = accept(this->server_socket, (struct sockaddr *)&addr,
-                                                        &addr_len);
-                        if(fcntl(this->server_socket , F_SETFL, O_NONBLOCK) == -1)
-                            throw "fcntl failed !";
-                        if(client_socket != -1)
-                        {
-                            ev.events = EPOLLIN;
-                            ev.data.fd =    client_socket;
-                            client.push_back(client_socket);
-                            epoll_ctl(fd_epoll, EPOLL_CTL_ADD,client_socket, &ev);
-                        }
+                        add_connection();
                     }
                     else
                     {
-                        char buffer[1024];
-                        int recv_byte;
-                        int send_byte;
-                        recv_byte = recv(evlist[i].data.fd,buffer,sizeof(buffer),MSG_DONTWAIT);
-                        if(recv_byte > 0)
-                        {
-                            std::cout << buffer << std::endl;
-                            char sent[1024] = "mesg accepted";
-                            send_byte = send(evlist[i].data.fd,sent,sizeof(sent),MSG_DONTWAIT);
-
-                            
-                        }
-                        else
-                        {
-                            if (epoll_ctl(fd_epoll, EPOLL_CTL_DEL, evlist[i].data.fd, NULL) == -1) 
-                                std::cerr << "epoll_ctl: EPOLL_CTL_DEL" << std::endl;
-
-                        }
+                      handle_request(evlist[i].data.fd);
                     }
                 }
+            }
+        }
+
+        void server::add_connection()
+        {
+            struct sockaddr_in addr;
+            struct epoll_event ev;
+            socklen_t  addr_len = sizeof(addr);
+            int client_socket;
+            client_socket = accept(this->server_socket, (struct sockaddr *)&addr,
+                                    &addr_len);
+            if(fcntl(this->server_socket , F_SETFL, O_NONBLOCK) == -1)
+                throw "fcntl failed !";
+            if(client_socket != -1)
+            {
+                ev.events = EPOLLIN;
+                ev.data.fd = client_socket;
+                client.push_back(client_socket);
+                epoll_ctl(this->fd_epoll, EPOLL_CTL_ADD,client_socket, &ev);
+            }
+        }
+
+        void server::handle_request(int fd)
+        {
+            char buffer[1024];
+            int recv_byte;
+            recv_byte = recv(fd,buffer,sizeof(buffer),MSG_DONTWAIT);
+            if(recv_byte > 0)
+            {
+                std::string buff(buffer);
+                this->mab[fd] +=  buff;
+                if (this->mab[fd].find("\n") != std::string::npos)
+                {
+                    send(fd,this->mab[fd].c_str(),this->mab[fd].size(),MSG_DONTWAIT);      
+                    this->mab[fd] = "";
+                }
+                    
+            }
+            else
+            {
+                if (epoll_ctl(fd_epoll, EPOLL_CTL_DEL, fd, NULL) == -1) 
+                    std::cerr << "epoll_ctl: EPOLL_CTL_DEL" << std::endl;
             }
         }
