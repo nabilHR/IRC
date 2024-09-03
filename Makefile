@@ -3,32 +3,34 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: nbaghoug <nbaghoug@student.42.fr>          +#+  +:+       +#+         #
+#    By: anas <anas@student.42.fr>                  +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/05/15 10:47:44 by nbaghoug          #+#    #+#              #
-#    Updated: 2024/05/19 10:31:51 by nbaghoug         ###   ########.fr        #
+#    Updated: 2024/06/25 22:45:30 by anas             ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
-
-CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -fsanitize=address -g3
+CXXFLAGS = -std=c++98  -fsanitize=address -g3
 CXX = c++
-file_cpp = ircserv.cpp  server.cpp
-file_o   = ircserv.o  server.o
+SRCS = ./IRC/ircserv.cpp ./IRC/server.cpp client.cpp clientM.cpp utils.cpp ./IRC/channel.cpp
+OBJS = $(SRCS:.cpp=.o) 
 
 NAME = ircserv
 
-all : $(NAME)
+all: $(NAME)
 
-$(NAME): $(file_o)
-	$(CXX) $(CXXFLAGS) $(file_o) -o $(NAME)
+$(NAME): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(NAME)
 
-fclean : clean
-	 rm -rf $(NAME)
+%.o: %.cpp 
+	$(CXX) $(CXXFLAGS) -c $< -o $@ 
 
 clean:
-	rm -rf $(file_o)
+	rm -f $(OBJS)
 
-re:fclean all
+fclean: clean
+	rm -f $(NAME)
 
-.PHONY : all re fclean clean
+re: fclean all
+
+.PHONY: all clean fclean re  
