@@ -19,7 +19,7 @@
         {
             this->port = 7777;
             clientManager = ClientManager::getInstance();
-            this->password = "default_value";
+            this->password = "no password is set!";
             this->server_socket = -1;
         }
         
@@ -38,13 +38,13 @@
 
         server::server(server& server): port(server.port), password(server.password)
         {
-
+            
         }
 
-        void server::sig_handler(int signum)
+        void server::sig_handler(int)
         {
             signal_has_recieve = true;
-            std::cout << "signal to CLOSE THE SERVER  has recieve " << signum << std::endl;
+            std::cout << "we recieve a signal to close the  SERVER ... server will closed now!! "  << std::endl;
         }
 
 
@@ -61,17 +61,18 @@
         void    server::create_socket()
         {
             this->server_socket = socket(AF_INET,SOCK_STREAM,0);
-           int opt = 1;
+            int opt = 1;
             if (setsockopt(this->server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) 
             {
-                std::cerr << "Failed to set SO_REUSEADDR\n";
+                std::cerr << "Failed to set adress to reuse !!!" << std::endl;
                 exit(1);
-
             }
     
             if(fcntl(this->server_socket , F_SETFL, O_NONBLOCK) == -1)
-                throw "fcntl failed !";
-         
+            {
+                std::cerr << "FILE CONTROL FAILED !!!" << std::endl;
+                exit(1);
+            }
 
         }
 
@@ -99,27 +100,28 @@
             fd_epoll = epoll_create1(0);
 
             if(fd_epoll < 0)
-            {
                 std::cerr <<  "couldn't create an instance of epoll" << std::endl;
-            }
             epoll_ctl(fd_epoll, EPOLL_CTL_ADD, this->server_socket, &ev);
-           while (!signal_has_recieve) {
-                    nb = epoll_wait(fd_epoll, evlist, 100, -1);
-                    if (nb == -1) {
-                        std::cerr << "SERVER WILL BE CLOSED SOON!" << std::endl;
-                        break;
-                    }
-
-                    for (int i = 0; i < nb; ++i) {
-
-                        if (this->server_socket == evlist[i].data.fd ) {
-                            std::cout << "New connection detected on server socket." << std::endl;
-                            add_connection();
-                        } else if (evlist[i].events & EPOLLIN) {
-                            handle_request(evlist[i].data.fd);
-                        }
-                    }
+            while (!signal_has_recieve) 
+            {
+                nb = epoll_wait(fd_epoll, evlist, 100, -1);
+                if (nb == -1) 
+                {
+                    std::cerr << "SERVER WILL BE CLOSED SOON!" << std::endl;
+                    break;
                 }
+
+                for (int i = 0; i < nb; ++i) 
+                {
+                    if (this->server_socket == evlist[i].data.fd ) 
+                    {
+                        std::cout << "New connection detected on server socket." << std::endl;
+                        add_connection();
+                    } 
+                    else if (evlist[i].events & EPOLLIN) 
+                            handle_request(evlist[i].data.fd);
+                }
+            }
             this->clientManager->free_all();
             close(this->server_socket);
             dprintf(1,"SOCKET CLOSED\n");
@@ -135,11 +137,14 @@
                                     &addr_len);
             if (client_socket == -1)
             {
-                std::cout << "The server socket wasn't created successfully!" << std::endl;
+                std::cout << "The client socket wasn't created successfully!" << std::endl;
                 exit(1);
             }
             if(fcntl(client_socket , F_SETFL, O_NONBLOCK) == -1)
-                throw "fcntl failed !";
+            {
+                std::cerr << "FILE CONTROL FAILED !!!" << std::endl;
+                exit(1);
+            }
             if(client_socket != -1)
             { 
                 ev.events = EPOLLIN;
@@ -148,9 +153,7 @@
                 epoll_ctl(fd_epoll, EPOLL_CTL_ADD,client_socket, &ev);
                 client* newClient = new client(client_socket , this->port, this->password);
                 if(newClient)
-                {
                     clientManager->addClient(client_socket, newClient);
-                }
                 else 
                     exit(1);
             }
@@ -163,24 +166,27 @@
             memset(buffer,0,1024);
             recv_byte = recv(fd,buffer,sizeof(buffer) - 1, 0);
             client* currentClient = clientManager->getClient(fd);
-            if(recv_byte > 0)
+            if (recv_byte > 500)
+            {
+                dprintf(fd,"you passed the message limit : camera wowo!\n");
+            }
+            else if(recv_byte > 0)
             {   
                 std::string buff(buffer);
                 this->mab[fd] +=  buff;
                 if (this->mab[fd].find("\n") != std::string::npos)
                 {
-                    if(currentClient){
+                    if(currentClient)
                         currentClient->check_cmd(fd, this->mab[fd]);
-                    }
                     this->mab[fd] = "";
-                }
-                    
+                }    
             }
-            if (recv_byte <=  0)
-            {
+            else if (recv_byte <=  0)
+            {   
                 this->mab.erase(fd);
                 if (epoll_ctl(fd_epoll, EPOLL_CTL_DEL, fd, NULL) == -1) 
                     std::cerr << "epoll_ctl: EPOLL_CTL_DEL" << std::endl;
+                clientManager->removeClientFromChannels(fd);
                 clientManager->removeClient(fd);
                 close(fd);
             }
